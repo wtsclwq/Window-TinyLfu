@@ -4,17 +4,17 @@ type cmRow []byte
 
 // 为什么要➗2？
 // 通常认为一个技术器占4bit，那么如果一行有numCounters个技术器，就只需要numCounters/2个bytes
-func newCmRow(numCounters uint64) cmRow {
+func newCmRow(numCounters uint32) cmRow {
 	return make(cmRow, numCounters/2)
 }
 
 // [0001 0010],[0111 1111]
-func (r cmRow) get(n uint64) byte {
+func (r cmRow) get(n uint32) byte {
 	// 如果n是偶数，n&1=0, 否则n&1=1
 	return byte(r[n/2]>>((n&1)*4)) & 0x0f
 }
 
-func (r cmRow) increase(n uint64) {
+func (r cmRow) increase(n uint32) {
 	// 定位到第i个byte
 	i := n / 2
 	// 如果是n是奇数，我们就要左边4位，否则要右边4位
@@ -42,16 +42,4 @@ func (r cmRow) clear() {
 	for i := range r {
 		r[i] = 0
 	}
-}
-
-func next2Power(x uint64) uint64 {
-	x--
-	x |= x >> 1
-	x |= x >> 2
-	x |= x >> 4
-	x |= x >> 8
-	x |= x >> 16
-	x |= x >> 32
-	x++
-	return x
 }

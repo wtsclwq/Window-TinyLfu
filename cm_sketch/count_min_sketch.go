@@ -3,24 +3,20 @@ package cm_sketch
 import (
 	"hash"
 	"math"
-
-	"github.com/spaolacci/murmur3"
 )
 
 type CmSketch struct {
 	rows        []cmRow
-	hashHelpers []hash.Hash64
+	hashHelpers []hash.Hash32
 }
 
-func NewCmSketch(counterNum uint64, rowNum int) *CmSketch {
+func NewCmSketch(counterNum int, hashHelpers []hash.Hash32) *CmSketch {
 	cms := new(CmSketch)
-	cms.rows = make([]cmRow, 0, rowNum)
-	cms.hashHelpers = make([]hash.Hash64, 0, rowNum)
-	var initSeed uint32 = 64
-	for i := 0; i < rowNum; i++ {
-		cms.rows = append(cms.rows, newCmRow(counterNum))
-		cms.hashHelpers = append(cms.hashHelpers, murmur3.New64WithSeed(initSeed))
+	cms.rows = make([]cmRow, 0, len(hashHelpers))
+	for i := 0; i < len(hashHelpers); i++ {
+		cms.rows = append(cms.rows, newCmRow(uint32(counterNum)))
 	}
+	cms.hashHelpers = hashHelpers
 	return cms
 }
 
@@ -53,20 +49,20 @@ func (s *CmSketch) Clear() {
 	}
 }
 
-func rowIncrease(row cmRow, value string, helper hash.Hash64) {
+func rowIncrease(row cmRow, value string, helper hash.Hash32) {
 	helper.Reset()
 	if _, err := helper.Write([]byte(value)); err != nil {
 		panic(err)
 	}
-	hashed := helper.Sum64() % uint64(len(row))
+	hashed := helper.Sum32() % uint32(len(row))
 	row.increase(hashed)
 }
 
-func rowEstimate(row cmRow, value string, helper hash.Hash64) uint8 {
+func rowEstimate(row cmRow, value string, helper hash.Hash32) uint8 {
 	helper.Reset()
 	if _, err := helper.Write([]byte(value)); err != nil {
 		panic(err)
 	}
-	hashed := helper.Sum64() % uint64(len(row))
+	hashed := helper.Sum32() % uint32(len(row))
 	return row.get(hashed)
 }
