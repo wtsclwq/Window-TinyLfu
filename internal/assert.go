@@ -1,4 +1,4 @@
-package util
+package internal
 
 func AssertWithMsg(condition bool, message string) {
 	if !condition {

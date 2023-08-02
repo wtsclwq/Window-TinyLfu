@@ -1,7 +1,9 @@
-package util
+package internal
 
 import (
 	"unsafe"
+
+	"github.com/spaolacci/murmur3"
 )
 
 type HashKey[K comparable] struct {
@@ -21,7 +23,7 @@ func NewHash[K comparable]() *HashKey[K] {
 	return h
 }
 
-func (h *HashKey[K]) Hash(key K) string {
+func (h *HashKey[K]) Hash(key K) uint64 {
 	var strKey string
 	if h.isStr {
 		strKey = *(*string)(unsafe.Pointer(&key))
@@ -31,5 +33,5 @@ func (h *HashKey[K]) Hash(key K) string {
 			len  int
 		}{unsafe.Pointer(&key), h.size}))
 	}
-	return strKey
+	return murmur3.Sum64([]byte(strKey))
 }

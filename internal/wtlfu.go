@@ -1,11 +1,9 @@
 package internal
 
 import (
-	"github.com/spaolacci/murmur3"
 	"hash"
-	"wtlfu/bf"
-	"wtlfu/cm_sketch"
-	"wtlfu/internal/util"
+
+	"github.com/spaolacci/murmur3"
 )
 
 const hashNum = 4
@@ -15,13 +13,13 @@ type WTinyLFU[K comparable, V any] struct {
 	window    *Lru[K, V]
 	mainCache *SLru[K, V]
 
-	cmSketch   *cm_sketch.CmSketch
-	doorKeeper *bf.BloomFilter
+	cmSketch   *CmSketch
+	doorKeeper *BloomFilter
 
 	tick      int
 	threshold int
 
-	hashKey *util.HashKey[K]
+	hashKey *HashKey[K]
 }
 
 func NewWTinyLFU[K comparable, V any](totalSize, threshold int) *WTinyLFU[K, V] {
@@ -44,13 +42,13 @@ func NewWTinyLFU[K comparable, V any](totalSize, threshold int) *WTinyLFU[K, V] 
 		window:    NewLru[K, V](windowSize),
 		mainCache: newSLru[K, V](mainSize),
 
-		cmSketch:   cm_sketch.NewCmSketch(totalSize*2, hashHelpers),
-		doorKeeper: bf.NewBloomFilter(hashNum, uint32(totalSize)),
+		cmSketch:   NewCmSketch(totalSize*2, hashHelpers),
+		doorKeeper: NewBloomFilter(hashNum, uint32(totalSize)),
 
 		tick:      0,
 		threshold: threshold,
 
-		hashKey: util.NewHash[K](),
+		hashKey: NewHash[K](),
 	}
 }
 

@@ -1,20 +1,28 @@
 package internal
 
 type List[K comparable, V any] struct {
+	listType ListType
+
 	root Item[K, V] // sentinel node
 
 	len int
+	cap int
 }
 
 func (l *List[K, V]) Init() *List[K, V] {
-	l.root.next = &l.root
-	l.root.pre = &l.root
+	l.root = Item[K, V]{} // sentinel node
+	l.root.setPre(&l.root, l.listType)
+	l.root.setNext(&l.root, l.listType)
 	l.len = 0
 	return l
 }
 
-func NewList[K comparable, V any]() *List[K, V] {
-	return new(List[K, V]).Init()
+func NewList[K comparable, V any](cap int, listType ListType) *List[K, V] {
+	l := &List[K, V]{
+		listType: listType,
+		cap:      cap,
+	}
+	return l.Init()
 }
 
 func (l *List[K, V]) layInit() {
@@ -31,39 +39,47 @@ func (l *List[K, V]) Front() *Item[K, V] {
 	if l.len == 0 {
 		return nil
 	}
-	return l.root.next
+	return l.root.Next(l.listType)
 }
 
 func (l *List[K, V]) Back() *Item[K, V] {
 	if l.len == 0 {
 		return nil
 	}
-	return l.root.pre
+	return l.root.Pre(l.listType)
 }
 
 // insert inserts newItem after atItem
 // a <-> b <-> c <-> d   newItem = x, atItem = c   ===>  a <-> b <-> c <->  [x]  <-> d
 func (l *List[K, V]) insert(newItem, atItem *Item[K, V]) *Item[K, V] {
-	newItem.pre = atItem
-	newItem.next = atItem.next
+	var evicted *Item[K, V]
+	if l.len >= l.cap {
+		evicted = l.PopBack()
+	}
 
-	newItem.pre.next = newItem
-	newItem.next.pre = newItem
+	newItem.belong = l.listType
 
-	newItem._list = l
+	newItem.setPre(atItem, l.listType)
+	newItem.setNext(atItem.Next(l.listType), l.listType)
+
+	newItem.Pre(l.listType).setNext(newItem, l.listType)
+	newItem.Next(l.listType).setPre(newItem, l.listType)
+
 	l.len++
 
-	return newItem
+	return evicted
 }
 
 // remove removes i in list
 func (l *List[K, V]) remove(i *Item[K, V]) {
-	i.pre.next = i.next
-	i.next.pre = i.pre
+	i.Pre(l.listType).setNext(i.Next(l.listType), l.listType)
+	i.Next(l.listType).setPre(i.Pre(l.listType), l.listType)
 
-	i.next = nil
-	i.pre = nil
-	i._list = nil
+	i.setPre(nil, l.listType)
+	i.setNext(nil, l.listType)
+
+	i.belong = UNKNOWN
+
 	l.len--
 }
 
@@ -74,14 +90,14 @@ func (l *List[K, V]) move(i, at *Item[K, V]) {
 		return
 	}
 
-	i.pre.next = i.next
-	i.next.pre = i.pre
+	i.Pre(l.listType).setNext(i.Next(l.listType), l.listType)
+	i.Next(l.listType).setPre(i.Pre(l.listType), l.listType)
 
-	i.pre = at
-	i.next = at.next
+	i.setPre(at, l.listType)
+	i.setNext(at.Next(l.listType), l.listType)
 
-	i.pre.next = i
-	i.next.pre = i
+	i.Pre(l.listType).setNext(i, l.listType)
+	i.Next(l.listType).setPre(i, l.listType)
 }
 
 // Remove removes i from l if the i is in the list l
@@ -118,4 +134,18 @@ func (l *List[K, V]) MoveToBack(i *Item[K, V]) {
 		return
 	}
 	l.move(i, l.root.pre)
+}
+
+func (l *List[K, V]) PopBack() *Item[K, V] {
+	if l.len == 0 {
+		return nil
+	}
+	return l.Remove(l.Back())
+}
+
+func (l *List[K, V]) PopFront() *Item[K, V] {
+	if l.len == 0 {
+		return nil
+	}
+	return l.Remove(l.Front())
 }
