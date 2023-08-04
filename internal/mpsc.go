@@ -1,15 +1,8 @@
-// Package mpsc provides an efficient implementation of a multi-producer, single-consumer lock-free queue.
-//
-// The Push function is safe to call from multiple goroutines. The Pop and Empty APIs must only be
-// called from a single, consumer goroutine.
 package internal
-
-// This implementation is based on http://www.1024cores.net/home/lock-free-algorithms/queues/non-intrusive-mpsc-node-based-queue
 
 import (
 	"sync"
 	"sync/atomic"
-	"unsafe"
 )
 
 type node[V any] struct {
@@ -18,7 +11,7 @@ type node[V any] struct {
 }
 
 type Queue[V any] struct {
-	head, tail *node[V]
+	head, tail atomic.Value // 使用 atomic.Value 替代 atomic.Pointer
 	nodePool   sync.Pool
 }
 
@@ -27,35 +20,29 @@ func NewQueue[V any]() *Queue[V] {
 		return new(node[V])
 	}}}
 	stub := &node[V]{}
-	q.head = stub
-	q.tail = stub
+	q.head.Store(stub) // 使用 Store 方法替代直接赋值
+	q.tail.Store(stub) // 使用 Store 方法替代直接赋值
 	return q
 }
 
-// Push adds x to the back of the queue.
-//
-// Push can be safely called from multiple goroutines
 func (q *Queue[V]) Push(x V) {
 	n := q.nodePool.Get().(*node[V])
 	n.val = x
 	// current producer acquires head node
-	prev := (*node[V])(atomic.SwapPointer((*unsafe.Pointer)(unsafe.Pointer(&q.head)), unsafe.Pointer(n)))
+	prev := q.head.Swap(n).(*node[V]) // 使用 Swap 方法替代直接赋值
 
 	// release node to consumer
-	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&prev.next)), unsafe.Pointer(n))
+	prev.next = n // 不再需要使用 atomic.StorePointer
 }
 
-// Pop removes the item from the front of the queue or nil if the queue is empty
-//
-// Pop must be called from a single, consumer goroutine
 func (q *Queue[V]) Pop() (V, bool) {
-	tail := q.tail
-	next := (*node[V])(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&tail.next)))) // acquire
+	tail := q.tail.Load().(*node[V]) // 使用 Load 方法替代直接赋值
+	next := tail.next
 	if next != nil {
 		var null V
-		q.tail = next
 		v := next.val
 		next.val = null
+		q.tail.Store(next) // 使用 Store 方法替代直接赋值
 		tail.next = nil
 		q.nodePool.Put(tail)
 		return v, true
@@ -64,11 +51,7 @@ func (q *Queue[V]) Pop() (V, bool) {
 	return null, false
 }
 
-// Empty returns true if the queue is empty
-//
-// Empty must be called from a single, consumer goroutine
 func (q *Queue[V]) Empty() bool {
-	tail := q.tail
-	next := (*node[V])(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&tail.next))))
-	return next == nil
+	tail := q.tail.Load().(*node[V]) // 使用 Load 方法替代直接赋值
+	return tail.next == nil
 }

@@ -5,11 +5,11 @@ import "sync/atomic"
 type ListType uint8
 
 const (
-	PROBATION ListType = iota
-	PROTECTION
-	WINDOW
-	TIMEWHELL
-	UNKNOWN
+	ListProbation ListType = iota
+	ListProtection
+	ListWindow
+	ListTimeWheel
+	ListUnknown
 )
 
 const (
@@ -19,14 +19,14 @@ const (
 )
 
 type ReadBufItem[K comparable, V any] struct {
-	entry *Item[K, V]
-	hash  uint64
+	item *Item[K, V]
+	hash uint64
 }
 
 type WriteBufItem[K comparable, V any] struct {
-	entry     *Item[K, V]
-	code      int8
-	rechedule bool
+	item       *Item[K, V]
+	code       int8
+	reSchedule bool
 }
 
 type Item[K comparable, V any] struct {
@@ -48,7 +48,7 @@ type Item[K comparable, V any] struct {
 	next  *Item[K, V]
 	pre   *Item[K, V]
 
-	// timewhell list meta data
+	// timeWheel list meta data
 	wheelPre  *Item[K, V]
 	wheelNext *Item[K, V]
 }
@@ -65,18 +65,22 @@ func NewItem[K comparable, V any](key K, val V, expire int64) *Item[K, V] {
 }
 
 func (i *Item[K, V]) isNew() bool {
-	return i._list == nil && i.pre == nil && i.next == nil && i.belong == UNKNOWN
+	return i._list == nil && i.pre == nil && i.next == nil && i.belong == ListUnknown
+}
+
+func (i *Item[K, V]) isNewWheel() bool {
+	return i._list == nil && i.wheelPre == nil && i.wheelNext == nil && i.belong == ListUnknown
 }
 
 func (i *Item[K, V]) Next(belong ListType) *Item[K, V] {
 	switch belong {
-	case PROBATION, PROTECTION, WINDOW:
+	case ListProbation, ListProtection, ListWindow:
 		n := i.next
 		// because list is a ring list, the back item.next is list.root, but we want nil
 		if i._list != nil && &i._list.root != n {
 			return n
 		}
-	case TIMEWHELL:
+	case ListTimeWheel:
 		n := i.wheelNext
 		// because list is a ring list, the back item.next is list.root, but we want nil
 		if i._list != nil && &i._list.root != n {
@@ -89,13 +93,13 @@ func (i *Item[K, V]) Next(belong ListType) *Item[K, V] {
 func (i *Item[K, V]) Pre(belong ListType) *Item[K, V] {
 
 	switch belong {
-	case PROBATION, PROTECTION, WINDOW:
+	case ListProbation, ListProtection, ListWindow:
 		p := i.pre
 		// because list is a ring list, the front item.pre is list.root, but we want nil
 		if i._list != nil && &i._list.root != p {
 			return p
 		}
-	case TIMEWHELL:
+	case ListTimeWheel:
 		p := i.wheelPre
 		// because list is a ring list, the front item.pre is list.root, but we want nil
 		if i._list != nil && &i._list.root != p {
@@ -107,18 +111,38 @@ func (i *Item[K, V]) Pre(belong ListType) *Item[K, V] {
 
 func (i *Item[K, V]) setPre(pre *Item[K, V], belong ListType) {
 	switch belong {
-	case PROBATION, PROTECTION, WINDOW:
+	case ListProbation, ListProtection, ListWindow:
 		i.pre = pre
-	case TIMEWHELL:
+	case ListTimeWheel:
 		i.wheelPre = pre
 	}
 }
 
 func (i *Item[K, V]) setNext(next *Item[K, V], belong ListType) {
 	switch belong {
-	case PROBATION, PROTECTION, WINDOW:
+	case ListProbation, ListProtection, ListWindow:
 		i.next = next
-	case TIMEWHELL:
+	case ListTimeWheel:
 		i.wheelNext = next
 	}
+}
+
+func (i *Item[K, V]) getPrev(listType ListType) *Item[K, V] {
+	switch listType {
+	case ListProbation, ListProtection, ListWindow:
+		return i.pre
+	case ListTimeWheel:
+		return i.wheelPre
+	}
+	return nil
+}
+
+func (i *Item[K, V]) getNext(listType ListType) *Item[K, V] {
+	switch listType {
+	case ListProbation, ListProtection, ListWindow:
+		return i.next
+	case ListTimeWheel:
+		return i.wheelNext
+	}
+	return nil
 }

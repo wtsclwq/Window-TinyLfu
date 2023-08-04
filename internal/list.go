@@ -13,6 +13,7 @@ func (l *List[K, V]) Init() *List[K, V] {
 	l.root = Item[K, V]{} // sentinel node
 	l.root.setPre(&l.root, l.listType)
 	l.root.setNext(&l.root, l.listType)
+	l.root._list = l
 	l.len = 0
 	return l
 }
@@ -60,10 +61,10 @@ func (l *List[K, V]) insert(newItem, atItem *Item[K, V]) *Item[K, V] {
 	newItem.belong = l.listType
 
 	newItem.setPre(atItem, l.listType)
-	newItem.setNext(atItem.Next(l.listType), l.listType)
+	newItem.setNext(atItem.getNext(l.listType), l.listType)
 
-	newItem.Pre(l.listType).setNext(newItem, l.listType)
-	newItem.Next(l.listType).setPre(newItem, l.listType)
+	newItem.getPrev(l.listType).setNext(newItem, l.listType)
+	newItem.getNext(l.listType).setPre(newItem, l.listType)
 
 	l.len++
 
@@ -72,13 +73,13 @@ func (l *List[K, V]) insert(newItem, atItem *Item[K, V]) *Item[K, V] {
 
 // remove removes i in list
 func (l *List[K, V]) remove(i *Item[K, V]) {
-	i.Pre(l.listType).setNext(i.Next(l.listType), l.listType)
-	i.Next(l.listType).setPre(i.Pre(l.listType), l.listType)
+	i.getPrev(l.listType).setNext(i.getNext(l.listType), l.listType)
+	i.getNext(l.listType).setPre(i.getPrev(l.listType), l.listType)
 
 	i.setPre(nil, l.listType)
 	i.setNext(nil, l.listType)
 
-	i.belong = UNKNOWN
+	i.belong = ListUnknown
 
 	l.len--
 }
@@ -90,14 +91,14 @@ func (l *List[K, V]) move(i, at *Item[K, V]) {
 		return
 	}
 
-	i.Pre(l.listType).setNext(i.Next(l.listType), l.listType)
-	i.Next(l.listType).setPre(i.Pre(l.listType), l.listType)
+	i.getPrev(l.listType).setNext(i.getNext(l.listType), l.listType)
+	i.getNext(l.listType).setPre(i.getPrev(l.listType), l.listType)
 
 	i.setPre(at, l.listType)
-	i.setNext(at.Next(l.listType), l.listType)
+	i.setNext(at.getNext(l.listType), l.listType)
 
-	i.Pre(l.listType).setNext(i, l.listType)
-	i.Next(l.listType).setPre(i, l.listType)
+	i.getPrev(l.listType).setNext(i, l.listType)
+	i.getNext(l.listType).setPre(i, l.listType)
 }
 
 // Remove removes i from l if the i is in the list l
@@ -148,4 +149,8 @@ func (l *List[K, V]) PopFront() *Item[K, V] {
 		return nil
 	}
 	return l.Remove(l.Front())
+}
+
+func (l *List[K, V]) Cap() int {
+	return l.cap
 }

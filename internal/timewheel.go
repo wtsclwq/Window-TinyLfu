@@ -30,12 +30,12 @@ func NewTimerWheel[K comparable, V any](size uint) *TimerWheel[K, V] {
 	clock := &Clock{start: time.Now()}
 	buckets := []uint{64, 64, 32, 4, 1}
 	spans := []int64{
-		next2Power(((1 * time.Second).Nanoseconds())),
-		next2Power(((1 * time.Minute).Nanoseconds())),
-		next2Power(((1 * time.Hour).Nanoseconds())),
-		next2Power(((24 * time.Hour).Nanoseconds())),
-		next2Power(((24 * time.Hour).Nanoseconds())) * 4,
-		next2Power(((24 * time.Hour).Nanoseconds())) * 4,
+		next2Power((1 * time.Second).Nanoseconds()),
+		next2Power((1 * time.Minute).Nanoseconds()),
+		next2Power((1 * time.Hour).Nanoseconds()),
+		next2Power((24 * time.Hour).Nanoseconds()),
+		next2Power((24 * time.Hour).Nanoseconds()) * 4,
+		next2Power((24 * time.Hour).Nanoseconds()) * 4,
 	}
 
 	shift := []uint{
@@ -46,11 +46,11 @@ func NewTimerWheel[K comparable, V any](size uint) *TimerWheel[K, V] {
 		uint(bits.TrailingZeros64(uint64(spans[4]))),
 	}
 
-	wheel := [][]*List[K, V]{}
+	var wheel [][]*List[K, V]
 	for i := 0; i < 5; i++ {
-		tmp := []*List[K, V]{}
+		var tmp []*List[K, V]
 		for j := 0; j < int(buckets[i]); j++ {
-			tmp = append(tmp, NewList[K, V](0, TIMEWHELL))
+			tmp = append(tmp, NewList[K, V](0, ListTimeWheel))
 		}
 		wheel = append(wheel, tmp)
 	}
@@ -69,7 +69,7 @@ func NewTimerWheel[K comparable, V any](size uint) *TimerWheel[K, V] {
 func (tw *TimerWheel[K, V]) findIndex(expire int64) (int, int) {
 	duration := expire - tw.nanos
 	for i := 0; i < 5; i++ {
-		if duration < int64(tw.spans[i+1]) {
+		if duration < tw.spans[i+1] {
 			ticks := expire >> int(tw.shift[i])
 			slot := int(ticks) & (int(tw.buckets[i]) - 1)
 			return i, slot
@@ -78,17 +78,18 @@ func (tw *TimerWheel[K, V]) findIndex(expire int64) (int, int) {
 	return 4, 0
 }
 
-func (tw *TimerWheel[K, V]) deschedule(item *Item[K, V]) {
-	item.Pre(TIMEWHELL).setNext(item.Next(TIMEWHELL), TIMEWHELL)
-	item.Next(TIMEWHELL).setPre(item.Pre(TIMEWHELL), TIMEWHELL)
-	item.setNext(nil, TIMEWHELL)
-	item.setPre(nil, TIMEWHELL)
+func (tw *TimerWheel[K, V]) deSchedule(item *Item[K, V]) {
+	item.Pre(ListTimeWheel).setNext(item.Next(ListTimeWheel), ListTimeWheel)
+	item.Next(ListTimeWheel).setPre(item.Pre(ListTimeWheel), ListTimeWheel)
+	item.setNext(nil, ListTimeWheel)
+	item.setPre(nil, ListTimeWheel)
 }
 
 func (tw *TimerWheel[K, V]) schedule(item *Item[K, V]) {
-	if item.wheelPre != nil {
-		tw.deschedule(item)
+	if !item.isNewWheel() {
+		tw.deSchedule(item)
 	}
+	item.belong = ListTimeWheel
 	x, y := tw.findIndex(item.expire.Load())
 	tw.wheel[x][y].PushFront(item)
 }
@@ -122,9 +123,9 @@ func (tw *TimerWheel[K, V]) expire(index int, prevTicks int64, delta int64, remo
 		list := tw.wheel[index][i&int64(mask)]
 		item := list.Front()
 		for item != nil {
-			next := item.Next(TIMEWHELL)
+			next := item.Next(ListTimeWheel)
 			if item.expire.Load() <= tw.nanos {
-				tw.deschedule(item)
+				tw.deSchedule(item)
 				remove(item, EXPIRED)
 			} else {
 				tw.schedule(item)

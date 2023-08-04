@@ -26,7 +26,7 @@ func newBloomFilter(capacity int, falsePositiveRate float64) *bloomFilter {
 
 	return &bloomFilter{
 		m:      m,
-		filter: newbv(m),
+		filter: newBitVec(m),
 		k:      k,
 	}
 }
@@ -37,7 +37,7 @@ func (d *bloomFilter) insert(h uint64) bool {
 	h1, h2 := uint32(h), uint32(h>>32)
 	var o uint = 1
 	for i := uint32(0); i < d.k; i++ {
-		o &= d.filter.getset((h1 + (i * h2)) & (d.m - 1))
+		o &= d.filter.getAndSet((h1 + (i * h2)) & (d.m - 1))
 	}
 	return o == 1
 }
@@ -55,12 +55,12 @@ func (d *bloomFilter) reset() {
 // Internal routines for the bit vector
 type bitvector []uint64
 
-func newbv(size uint32) bitvector {
+func newBitVec(size uint32) bitvector {
 	return make([]uint64, uint(size+63)/64)
 }
 
 // set bit 'bit' in the bitvector d and return previous value
-func (b bitvector) getset(bit uint32) uint {
+func (b bitvector) getAndSet(bit uint32) uint {
 	shift := bit % 64
 	idx := bit / 64
 	bb := b[idx]
